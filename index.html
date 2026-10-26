@@ -159,11 +159,11 @@
   <button class="big" id="rAddSite">Add site</button>
 </div>
 
+<script src="peerjs.min.js"></script>
 <script>
 'use strict';
 // ---------- shared ----------
-const VERSION = 'v4';
-const RELAY = 'https://ntfy.sh';
+const VERSION = 'v5';
 const CINEMETA = 'https://v3-cinemeta.strem.io';
 // Titles used to learn the site's link pattern.
 const EX_MOVIE = { imdb: 'tt15239678', tmdb: '693134' };                 // Dune: Part Two
@@ -184,19 +184,41 @@ async function getJSON(url, ms = 15000) {
 const catalog = (type, search) => getJSON(CINEMETA + '/catalog/' + type + '/top' + (search ? '/search=' + encodeURIComponent(search) : '') + '.json').then(j => j.metas || []);
 const meta = (type, id) => getJSON(CINEMETA + '/meta/' + type + '/' + id + '.json').then(j => j.meta);
 
-// The relay: one private topic per TV code. Messages are small JSON objects.
-const topicFor = code => 'shelftv-' + code.toLowerCase().replace(/[^a-z0-9]/g, '');
-const send = (code, msg) => fetch(RELAY + '/' + topicFor(code), { method: 'POST', body: JSON.stringify(msg) }).catch(() => {});
-function listen(code, onMsg, onState) {
-  let es, retry;
-  const open = () => {
-    es = new EventSource(RELAY + '/' + topicFor(code) + '/sse');
-    es.onopen = () => onState && onState(true);
-    es.onmessage = e => { try { const d = JSON.parse(e.data); if (d.event === 'message') onMsg(JSON.parse(d.message)); } catch {} };
-    es.onerror = () => { onState && onState(false); es.close(); clearTimeout(retry); retry = setTimeout(open, 3000); };
+// Phone <-> iPad link: a direct WebRTC connection (PeerJS). The free PeerJS server is only
+// used to find each other; messages then go straight across your Wi-Fi, with no limits.
+const PEER_OPTS = { debug: 0 };
+const peerId = code => 'shelftv-' + code.toLowerCase().replace(/[^a-z0-9]/g, '') + '-tv';
+const conns = new Set();
+const pending = [];   // commands tapped before the link is up (e.g. right after opening the app)
+const send = (code, msg) => {
+  const open = [...conns].filter(c => c.open);
+  if (!open.length) { if (msg.t !== 'hello' && msg.t !== 'state') { pending.push(msg); pending.splice(0, pending.length - 5); } return; }
+  open.forEach(c => { try { c.send(msg); } catch {} });
+};
+function listen(code, onMsg, onState, role) {
+  let peer, retry, closed = false;
+  const again = (fn, ms) => { clearTimeout(retry); if (!closed) retry = setTimeout(fn, ms); };
+  const wire = c => {
+    c.on('open', () => { conns.add(c); pending.splice(0).forEach(m => { try { c.send(m); } catch {} }); onState && onState(true); });
+    c.on('data', d => { try { onMsg(typeof d === 'string' ? JSON.parse(d) : d); } catch {} });
+    c.on('close', () => { conns.delete(c); if (!conns.size) { onState && onState(false); if (role === 'remote') again(dial, 2000); } });
+    c.on('error', () => { conns.delete(c); if (role === 'remote') again(dial, 3000); });
   };
-  open();
-  return () => { clearTimeout(retry); es && es.close(); };
+  const dial = () => { if (closed || !peer || peer.destroyed) return; if (peer.disconnected) { peer.reconnect(); return; } wire(peer.connect(peerId(code), { reliable: true, serialization: 'json' })); };
+  const start = () => {
+    if (closed) return;
+    peer = role === 'tv' ? new Peer(peerId(code), PEER_OPTS) : new Peer(PEER_OPTS);
+    peer.on('open', () => { if (role === 'remote') dial(); });
+    if (role === 'tv') peer.on('connection', wire);
+    peer.on('disconnected', () => again(() => { if (!peer.destroyed) peer.reconnect(); }, 2000));
+    peer.on('error', e => {
+      if (e.type === 'peer-unavailable') again(dial, 4000);                       // TV not open yet
+      else if (e.type === 'unavailable-id') { peer.destroy(); again(start, 5000); } // old TV tab still holds the ID
+      else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(e.type)) { peer.destroy(); again(start, 4000); }
+    });
+  };
+  start();
+  return () => { closed = true; clearTimeout(retry); conns.forEach(c => c.close()); conns.clear(); peer && peer.destroy(); };
 }
 
 function posterEl(item, onClick) {
@@ -398,7 +420,7 @@ function startTV() {
     // Unlock the one <video> element so the remote can start playback with sound later.
     v.muted = true; v.play().catch(() => {}); v.pause(); v.muted = false;
     $('#tvStart').classList.add('hidden');
-    listen(code, handle, ok => { if (ok) state(); });
+    listen(code, handle, ok => { if (ok) state(); }, 'tv');
   };
   document.addEventListener('visibilitychange', () => { if (document.hidden) remember(); });
 }
@@ -422,10 +444,10 @@ function startRemote() {
   const setStatus = () => {
     const s = $('#rStatus');
     if (!code) { s.className = 'off'; s.textContent = 'Not paired'; return; }
-    const ok = Date.now() - lastSeen < 20000;
+    const ok = Date.now() - lastSeen < 25000;
     s.className = ok ? 'ok' : 'off'; s.textContent = ok ? 'TV connected' : 'TV not responding';
   };
-  setInterval(() => { setStatus(); if (code && Date.now() - lastSeen > 15000) send(code, { t: 'hello', from: 'remote' }); }, 5000);
+  setInterval(() => { setStatus(); if (code) send(code, { t: 'hello', from: 'remote' }); }, 10000);
 
   function connect() {
     unlisten && unlisten(); setStatus();
@@ -434,7 +456,7 @@ function startRemote() {
       if (m.from !== 'tv' || m.t !== 'state') return;
       lastSeen = Date.now(); tvState = m; setStatus(); render();
       if (addons.length && !m.addons && !sentAddons) { sentAddons = true; cmd({ t: 'addons', list: addons }); }   // e.g. the iPad's storage was cleared
-    }, ok => { if (ok) send(code, { t: 'hello', from: 'remote' }); });
+    }, ok => { if (ok) send(code, { t: 'hello', from: 'remote' }); else setStatus(); }, 'remote');
   }
   const cmd = m => { if (!code) { openSheet('#rSettings'); return false; } m.from = 'remote'; send(code, m); return true; };
 

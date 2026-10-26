@@ -4,12 +4,12 @@
 - **TV mode** (`…/index.html?tv`) runs full screen on the iPad and shows whatever your phone picks.
 - **Remote mode** (`…/index.html`) runs on your iPhone. You search movies and shows with posters, tap an episode, and it opens on the TV in your FMHY site's player.
 
-There's no Stremio, no DNS profile and no account. The phone and iPad pass messages through ntfy.sh, a free relay, on a private topic named after your 8-character pairing code.
+There's no Stremio, no DNS profile and no account. The phone and iPad talk over a direct connection on your Wi-Fi (WebRTC). The free PeerJS server is only used to find each other by your 8-character pairing code.
 
 ## 1. Put the page online (5 minutes, on the Mac)
 Safari needs to load it from an https address. The free way is GitHub Pages:
 1. Sign in at github.com and create a new **public** repository called `shelftv`.
-2. Choose **Add file > Upload files** and drop in `index.html`.
+2. Choose **Add file > Upload files** and drop in `index.html` and `peerjs.min.js`.
 3. Go to **Settings > Pages**, set Source to **Deploy from a branch**, then choose **main** and **/(root)**, and save.
 4. About a minute later the page is live at `https://YOURNAME.github.io/shelftv/`.
 
