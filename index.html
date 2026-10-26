@@ -162,7 +162,7 @@
 <script>
 'use strict';
 // ---------- shared ----------
-const VERSION = 'v3';
+const VERSION = 'v4';
 const RELAY = 'https://ntfy.sh';
 const CINEMETA = 'https://v3-cinemeta.strem.io';
 // Titles used to learn the site's link pattern.
@@ -235,7 +235,8 @@ function startTV() {
   $('#tv').classList.remove('hidden');
   let code = store.get('code');
   if (!code) { code = Array.from(crypto.getRandomValues(new Uint8Array(8)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join(''); store.set('code', code); }
-  $('#tvPair').textContent = 'Pairing code: ' + code.slice(0, 4) + ' ' + code.slice(4) + ' · ' + VERSION;
+  $('#tvPair').textContent = 'Pairing code: ' + code.slice(0, 4) + ' ' + code.slice(4);
+  $('#tvClock').title = VERSION; $('#tvHint').textContent = 'Pick something on your phone. (' + VERSION + ')';
   const f = $('#tvFrame');
   let recent = store.get('recent', []);
   let now = null, toastT;
@@ -584,7 +585,8 @@ function startRemote() {
   };
   $('#rMovieEx').oninput = $('#rShowEx').oninput = showLearn;
   $('#rSave').onclick = () => {
-    code = $('#rCode').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    code = $('#rCode').value.toUpperCase().replace(/PAIRING|CODE|V\d+$/g, '').replace(/[^A-Z0-9]/g, '').slice(0, 8);
+    $('#rCode').value = code;
     store.set('rcode', code); connect();
     if (sites.length || addons.length) $('#rSettings').classList.add('hidden');
   };
