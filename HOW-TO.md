@@ -29,6 +29,13 @@ Safari needs to load it from an https address. The free way is GitHub Pages:
 3. **Add your sites.** For each site, open it in Safari, start *Dune: Part Two* and copy the watch-page address. Then open any *Breaking Bad* episode other than S1 E1 and copy that address too. Paste them under **Add a site** (one is enough if the site only has movies or only shows). The remote shows the pattern it learned, such as `…/movie/{tmdb}`. Add as many sites as you like: Movy, Cinejoy, Rive, whatever FMHY lists.
 4. Now search, tap a poster, and tap **Play on TV** or an episode. If you've saved more than one site, a row of site buttons appears above **Play**. Tap one to switch, for example when Movy is down or missing a title. The last one you picked becomes the default. You can change or remove sites anytime under **Settings**.
 
+## Ad-free direct playback (recommended)
+Instead of loading a website, the iPad fetches the video file from a free source and plays it in Shelf TV's own player. There are no ads or pop-ups, and the remote gets ⏯, ↺10, 30↻, a seek bar, ⇄ (switch source) and ⏻. Shows auto-play the next episode, and movies resume where you left off.
+
+One-time setup on the phone: open **pengu.uk** in Safari (PenguPlay, free HTTP streams, no account). Configure it if you want, then copy its install link (it starts with `stremio://` or ends in `/manifest.json`). In Shelf TV, go to **Settings > Ad-free sources**, paste the link and tap **Save sources**. From then on, **Play on TV** plays ad-free, and the site buttons on each title let you fall back to a website.
+
+If a title won't play, tap **⇄** and try another source. Files in formats Safari can't play (such as some .mkv files) are skipped automatically.
+
 ## Any website at all: "Send to TV"
 For sites that don't fit the pattern trick (sports, live TV, YouTube, anything else):
 - **Paste a link** into **Send any link** on the remote's home screen, **or**
